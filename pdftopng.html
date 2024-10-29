@@ -1,0 +1,75 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PDF to Image Converter</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.10.377/pdf.min.js"></script>
+    <style>
+        .pdf-page {
+            margin-bottom: 10px;
+            border: 2px solid black; /* 加上黑色邊框 */
+            padding: 5px;
+            display: inline-block;
+        }
+    </style>
+</head>
+<body>
+    <h1>PDF 轉圖片</h1>
+    <input type="file" id="pdfFile" accept="application/pdf" /><br><br>
+    <label for="pdfPassword">密碼（若無可留空）：</label>
+    <input type="password" id="pdfPassword" /><br><br>
+    <div id="pdfPages"></div>
+
+    <script>
+        // 設定 pdf.js 的 worker 路徑
+        pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.10.377/pdf.worker.min.js';
+
+        document.getElementById('pdfFile').addEventListener('change', async (e) => {
+            const file = e.target.files[0];
+            const password = document.getElementById('pdfPassword').value; // 讀取密碼欄位
+            if (file) {
+                const fileReader = new FileReader();
+                fileReader.onload = async (e) => {
+                    const typedArray = new Uint8Array(e.target.result);
+                    try {
+                        // 傳入密碼來加載 PDF
+                        const pdf = await pdfjsLib.getDocument({ data: typedArray, password }).promise;
+                        const pdfPages = document.getElementById('pdfPages');
+                        pdfPages.innerHTML = ''; // 清空之前的頁面
+
+                        for (let i = 1; i <= pdf.numPages; i++) {
+                            const page = await pdf.getPage(i);
+                            const viewport = page.getViewport({ scale: 1.5 });
+                            const canvas = document.createElement('canvas');
+                            const context = canvas.getContext('2d');
+                            canvas.width = viewport.width;
+                            canvas.height = viewport.height;
+
+                            // 動態加上邊框樣式
+                            canvas.style.border = "2px solid black";
+                            canvas.style.padding = "5px";
+                            canvas.classList.add("pdf-page");
+
+                            const renderContext = {
+                                canvasContext: context,
+                                viewport: viewport,
+                            };
+
+                            await page.render(renderContext).promise;
+                            pdfPages.appendChild(canvas);
+                        }
+                    } catch (error) {
+                        if (error.name === 'PasswordException') {
+                            alert("密碼錯誤，請重新輸入！");
+                        } else {
+                            console.error("加載 PDF 時發生錯誤：", error);
+                        }
+                    }
+                };
+                fileReader.readAsArrayBuffer(file);
+            }
+        });
+    </script>
+</body>
+</html>
